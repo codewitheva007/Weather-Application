@@ -113,7 +113,9 @@ function renderWeather(data) {
 }
 
 // --- VOICE SEARCH API ---
+// --- VOICE SEARCH API (DIAGNOSTIC VERSION) ---
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
 if (SpeechRecognition) {
   const recognition = new SpeechRecognition();
   recognition.continuous = false;
@@ -122,58 +124,67 @@ if (SpeechRecognition) {
   voiceBtn.addEventListener("click", () => {
     const langMap = { en: 'en-US', hi: 'hi-IN', es: 'es-ES', fr: 'fr-FR' };
     recognition.lang = langMap[langSelect.value] || 'en-US';
-    recognition.start();
+    
+    console.log(`Starting voice recognition for language: ${recognition.lang}`);
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error("Recognition start error (usually means it's already running):", e);
+    }
   });
 
+  recognition.onaudiostart = () => console.log("Audio capturing started (Mic is hot)");
+  recognition.onsoundstart = () => console.log("Sound detected (Noise is happening)");
+  recognition.onspeechstart = () => console.log("Speech detected (Words recognized)");
+
   recognition.onstart = () => {
+    console.log("Recognition service successfully started.");
     voiceBtn.classList.add("listening");
     cityInput.placeholder = langSelect.value === 'hi' ? "सुन रहा हूँ..." : "Listening...";
+    statusMessage.textContent = ""; 
   };
 
   recognition.onresult = (event) => {
     const transcript = event.results[0][0].transcript;
+    console.log("Transcript received:", transcript);
     cityInput.value = transcript.replace(/[.,]/g, ''); 
     searchBtn.click();
   };
 
   recognition.onend = () => {
+    console.log("Recognition service ended.");
     voiceBtn.classList.remove("listening");
     updateUILanguage(langSelect.value);
   };
 
-  recognition.onerror = () => {
+  recognition.onerror = (event) => {
+    console.error("Speech Recognition Error Fired:", event.error);
     voiceBtn.classList.remove("listening");
     updateUILanguage(langSelect.value);
-    statusMessage.textContent = "Voice access denied or not understood.";
+    
+    // Display the exact error in the UI
+    statusMessage.style.color = "#ff6b6b";
+    switch(event.error) {
+      case 'no-speech':
+        statusMessage.textContent = "Mic is on, but no speech was detected. Check input volume.";
+        break;
+      case 'audio-capture':
+        statusMessage.textContent = "No microphone found. OS might be blocking it.";
+        break;
+      case 'not-allowed':
+        statusMessage.textContent = "Permission to use mic was denied.";
+        break;
+      case 'network':
+        statusMessage.textContent = "Network error. Browser blocked the speech service connection.";
+        break;
+      default:
+        statusMessage.textContent = `Voice error: ${event.error}`;
+    }
   };
 } else {
+  console.warn("Speech Recognition API is not supported in this browser.");
   voiceBtn.style.display = "none";
 }
-
-// --- EVENT LISTENERS ---
-searchBtn.addEventListener("click", () => {
-  const city = cityInput.value.trim();
-  if (city) fetchWeatherByCity(city, langSelect.value);
-});
-
-cityInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") searchBtn.click();
-});
-
-langSelect.addEventListener("change", (e) => {
-  const selectedLang = e.target.value;
-  updateUILanguage(selectedLang);
-  if (currentCity) fetchWeatherByCity(currentCity, selectedLang);
-});
-
-geoBtn.addEventListener("click", () => {
-  if (!navigator.geolocation) return;
-  statusMessage.textContent = "Locating...";
-  navigator.geolocation.getCurrentPosition(
-    (pos) => fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude, langSelect.value),
-    () => { statusMessage.textContent = "Location access denied."; }
-  );
-});
 
 // Init
 updateUILanguage("en");
