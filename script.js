@@ -1,162 +1,101 @@
-// OpenWeatherMap se apni valid key yahan daalein:
 const API_KEY = "5e3cb83afcb65d108bfa39a77cfefdf6"; 
-let currentCity = "Delhi";
+let currentCity = "Meerut";
 
 const translations = {
-  en: {
-    langLabel: "Language:",
-    searchBtn: "Search",
-    placeholder: "Enter city name...",
-    humidity: "Humidity",
-    wind: "Wind Speed",
-    feelsLike: "Feels Like",
-    pressure: "Pressure",
-    notFound: "City not found. Please check spelling.",
-    invalidKey: "Invalid API Key. Using offline demo data.",
-    loading: "Fetching weather...",
-    geoError: "Location access denied or unavailable."
-  },
-  hi: {
-    langLabel: "भाषा:",
-    searchBtn: "खोजें",
-    placeholder: "शहर का नाम दर्ज करें...",
-    humidity: "नमी",
-    wind: "हवा की गति",
-    feelsLike: "महसूस तापमान",
-    pressure: "दबाव",
-    notFound: "शहर नहीं मिला। कृपया नाम जांचें।",
-    invalidKey: "API Key अमान्य है। डेमो डेटा दिखाया जा रहा है।",
-    loading: "मौसम विवरण प्राप्त हो रहा है...",
-    geoError: "स्थान अनुमति अस्वीकृत या अनुपलब्ध।"
-  },
-  es: {
-    langLabel: "Idioma:",
-    searchBtn: "Buscar",
-    placeholder: "Ingrese nombre de la ciudad...",
-    humidity: "Humedad",
-    wind: "Viento",
-    feelsLike: "Sensación",
-    pressure: "Presión",
-    notFound: "Ciudad no encontrada.",
-    invalidKey: "Clave API inválida.",
-    loading: "Cargando clima...",
-    geoError: "Acceso a la ubicación denegado."
-  },
-  fr: {
-    langLabel: "Langue:",
-    searchBtn: "Chercher",
-    placeholder: "Entrez le nom de la ville...",
-    humidity: "Humidité",
-    wind: "Vitesse du vent",
-    feelsLike: "Ressenti",
-    pressure: "Pression",
-    notFound: "Ville non trouvée.",
-    invalidKey: "Clé API non valide.",
-    loading: "Chargement...",
-    geoError: "Accès à la localisation refusé."
-  }
+  en: { langLabel: "Language:", searchBtn: "Search", placeholder: "Enter city name...", humidity: "Humidity", wind: "Wind Speed", feelsLike: "Feels Like", pressure: "Pressure", notFound: "City not found.", loading: "Fetching weather...", geoError: "Location denied or unavailable." },
+  hi: { langLabel: "भाषा:", searchBtn: "खोजें", placeholder: "शहर दर्ज करें...", humidity: "नमी", wind: "हवा", feelsLike: "महसूस", pressure: "दबाव", notFound: "शहर नहीं मिला।", loading: "प्राप्त हो रहा है...", geoError: "स्थान अनुपलब्ध।" },
+  es: { langLabel: "Idioma:", searchBtn: "Buscar", placeholder: "Ingrese ciudad...", humidity: "Humedad", wind: "Viento", feelsLike: "Sensación", pressure: "Presión", notFound: "Ciudad no encontrada.", loading: "Cargando clima...", geoError: "Acceso denegado." },
+  fr: { langLabel: "Langue:", searchBtn: "Chercher", placeholder: "Entrez la ville...", humidity: "Humidité", wind: "Vitesse", feelsLike: "Ressenti", pressure: "Pression", notFound: "Ville non trouvée.", loading: "Chargement...", geoError: "Accès refusé." }
 };
 
 const langSelect = document.getElementById("langSelect");
 const cityInput = document.getElementById("cityInput");
 const searchBtn = document.getElementById("searchBtn");
+const voiceBtn = document.getElementById("voiceBtn");
 const geoBtn = document.getElementById("geoBtn");
 const statusMessage = document.getElementById("statusMessage");
 const weatherDisplay = document.getElementById("weatherDisplay");
 
+// Dynamic Backgrounds based on weather
+function updateBackground(weatherMain) {
+  let bgUrl = "";
+  const condition = weatherMain.toLowerCase();
+
+  if (condition.includes("clear")) bgUrl = "https://images.unsplash.com/photo-1601297183305-6df142704ea2?q=80&w=2574&auto=format&fit=crop";
+  else if (condition.includes("cloud")) bgUrl = "https://images.unsplash.com/photo-1534088568595-a066f410bcda?q=80&w=2574&auto=format&fit=crop";
+  else if (condition.includes("rain") || condition.includes("drizzle")) bgUrl = "https://images.unsplash.com/photo-1519692933481-e162a57d6721?q=80&w=2574&auto=format&fit=crop";
+  else if (condition.includes("thunderstorm")) bgUrl = "https://images.unsplash.com/photo-1605727216801-e27ce1d0ce30?q=80&w=2574&auto=format&fit=crop";
+  else if (condition.includes("snow")) bgUrl = "https://images.unsplash.com/photo-1478265409131-1f65c88f965c?q=80&w=2574&auto=format&fit=crop";
+  else if (condition.includes("mist") || condition.includes("fog") || condition.includes("haze")) bgUrl = "https://images.unsplash.com/photo-1543968996-ee822b817625?q=80&w=2574&auto=format&fit=crop";
+  else bgUrl = "https://images.unsplash.com/photo-1527482797697-8795b05a13fe?q=80&w=2574&auto=format&fit=crop";
+
+  document.body.style.backgroundImage = `url('${bgUrl}')`;
+}
+
 function updateUILanguage(lang) {
   const dict = translations[lang] || translations.en;
-  document.getElementById("langLabel").textContent = dict.langLabel;
   searchBtn.textContent = dict.searchBtn;
-  cityInput.placeholder = dict.placeholder;
+  if(!voiceBtn.classList.contains("listening")) cityInput.placeholder = dict.placeholder;
   document.getElementById("labelHumidity").textContent = dict.humidity;
   document.getElementById("labelWind").textContent = dict.wind;
   document.getElementById("labelFeelsLike").textContent = dict.feelsLike;
   document.getElementById("labelPressure").textContent = dict.pressure;
 }
 
-// Fallback generator agar API Key activate na ho
-function generateMockWeather(cityName, lang) {
-  const isHindi = lang === 'hi';
-  return {
-    name: cityName.charAt(0).toUpperCase() + cityName.slice(1),
-    sys: { country: "IN" },
-    main: {
-      temp: 28,
-      feels_like: 30,
-      humidity: 58,
-      pressure: 1012
-    },
-    weather: [
-      {
-        description: isHindi ? "साफ मौसम (डेमो)" : "Clear sky (Demo)",
-        icon: "01d"
-      }
-    ],
-    wind: { speed: 3.5 }
-  };
-}
-
+// Fetch Logic
 async function fetchWeatherByCity(city, lang) {
   const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&units=metric&lang=${lang}&appid=${API_KEY}`;
-  await executeFetch(url, lang, city);
+  await executeFetch(url, lang);
 }
 
 async function fetchWeatherByCoords(lat, lon, lang) {
   const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&lang=${lang}&appid=${API_KEY}`;
-  await executeFetch(url, lang, "Your Location");
+  await executeFetch(url, lang);
 }
 
-async function executeFetch(url, lang, fallbackCityName) {
+async function executeFetch(url, lang) {
   const dict = translations[lang] || translations.en;
+  searchBtn.disabled = true;
   statusMessage.textContent = dict.loading;
-  statusMessage.style.color = "#ffffff";
 
-  // Agar user ne API Key replace nahi ki hai:
-  if (API_KEY === "YOUR_OPENWEATHERMAP_API_KEY" || !API_KEY) {
-    statusMessage.textContent = dict.invalidKey;
-    statusMessage.style.color = "#ffd166";
-    const mockData = generateMockWeather(fallbackCityName, lang);
-    renderWeather(mockData);
-    currentCity = mockData.name;
+  // Session Storage Cache Check
+  const cachedData = sessionStorage.getItem(url);
+  if (cachedData) {
+    const data = JSON.parse(cachedData);
+    renderWeather(data);
+    currentCity = data.name;
+    statusMessage.textContent = "";
+    searchBtn.disabled = false;
     return;
   }
 
+  // Set timeout to prevent infinite hanging
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
     
-    // Status checks
-    if (response.status === 401) {
-      statusMessage.textContent = `${dict.invalidKey} (Error 401)`;
-      statusMessage.style.color = "#ffd166";
-      const mockData = generateMockWeather(fallbackCityName, lang);
-      renderWeather(mockData);
-      return;
-    }
-
-    if (response.status === 404) {
-      statusMessage.textContent = dict.notFound;
-      statusMessage.style.color = "#ff6b6b";
-      weatherDisplay.classList.add("hidden");
-      return;
-    }
-
-    if (!response.ok) {
-      throw new Error(`HTTP Error: ${response.status}`);
-    }
+    if (!response.ok) throw new Error("Not Found");
 
     const data = await response.json();
+    sessionStorage.setItem(url, JSON.stringify(data)); // Save to cache
+    
     renderWeather(data);
     currentCity = data.name;
     statusMessage.textContent = "";
   } catch (error) {
-    statusMessage.textContent = dict.notFound;
-    statusMessage.style.color = "#ff6b6b";
+    statusMessage.textContent = error.name === 'AbortError' ? "Request timed out." : dict.notFound;
     weatherDisplay.classList.add("hidden");
+  } finally {
+    searchBtn.disabled = false;
   }
 }
 
 function renderWeather(data) {
+  updateBackground(data.weather[0].main);
+
   document.getElementById("cityName").textContent = `${data.name}, ${data.sys.country || ""}`;
   document.getElementById("temperature").textContent = `${Math.round(data.main.temp)}°C`;
   document.getElementById("description").textContent = data.weather[0].description;
@@ -166,50 +105,76 @@ function renderWeather(data) {
   document.getElementById("pressure").textContent = `${data.main.pressure} hPa`;
 
   const iconCode = data.weather[0].icon;
-  document.getElementById("weatherIcon").src = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+  const iconImg = document.getElementById("weatherIcon");
+  iconImg.src = `https://openweathermap.org/img/wn/${iconCode}@4x.png`;
+  iconImg.style.display = "block";
 
   weatherDisplay.classList.remove("hidden");
 }
 
+// --- VOICE SEARCH API ---
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognition) {
+  const recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  voiceBtn.addEventListener("click", () => {
+    const langMap = { en: 'en-US', hi: 'hi-IN', es: 'es-ES', fr: 'fr-FR' };
+    recognition.lang = langMap[langSelect.value] || 'en-US';
+    recognition.start();
+  });
+
+  recognition.onstart = () => {
+    voiceBtn.classList.add("listening");
+    cityInput.placeholder = langSelect.value === 'hi' ? "सुन रहा हूँ..." : "Listening...";
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    cityInput.value = transcript.replace(/[.,]/g, ''); 
+    searchBtn.click();
+  };
+
+  recognition.onend = () => {
+    voiceBtn.classList.remove("listening");
+    updateUILanguage(langSelect.value);
+  };
+
+  recognition.onerror = () => {
+    voiceBtn.classList.remove("listening");
+    updateUILanguage(langSelect.value);
+    statusMessage.textContent = "Voice access denied or not understood.";
+  };
+} else {
+  voiceBtn.style.display = "none";
+}
+
+// --- EVENT LISTENERS ---
 searchBtn.addEventListener("click", () => {
   const city = cityInput.value.trim();
-  if (city) {
-    fetchWeatherByCity(city, langSelect.value);
-  }
+  if (city) fetchWeatherByCity(city, langSelect.value);
 });
 
 cityInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") {
-    searchBtn.click();
-  }
+  if (e.key === "Enter") searchBtn.click();
 });
 
 langSelect.addEventListener("change", (e) => {
   const selectedLang = e.target.value;
   updateUILanguage(selectedLang);
-  if (currentCity) {
-    fetchWeatherByCity(currentCity, selectedLang);
-  }
+  if (currentCity) fetchWeatherByCity(currentCity, selectedLang);
 });
 
 geoBtn.addEventListener("click", () => {
-  const lang = langSelect.value;
-  const dict = translations[lang] || translations.en;
-  if (!navigator.geolocation) {
-    statusMessage.textContent = dict.geoError;
-    return;
-  }
-  statusMessage.textContent = dict.loading;
+  if (!navigator.geolocation) return;
+  statusMessage.textContent = "Locating...";
   navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude, lang);
-    },
-    () => {
-      statusMessage.textContent = dict.geoError;
-    }
+    (pos) => fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude, langSelect.value),
+    () => { statusMessage.textContent = "Location access denied."; }
   );
 });
 
-// App init
+// Init
 updateUILanguage("en");
 fetchWeatherByCity(currentCity, "en");
